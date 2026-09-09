@@ -1,0 +1,29 @@
+name: Check plugin
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: zip, pdo_sqlite
+          coverage: none
+      - name: PHP syntax
+        run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Archive behaviour
+        run: php tests/export.php
+      - name: Package installable plugin
+        run: |
+          mkdir -p dist/playground-to-wordpress-com
+          cp playground-to-wordpress-com.php includes-export.php README.md dist/playground-to-wordpress-com/
+          cp -R assets dist/playground-to-wordpress-com/
+          cd dist
+          zip -r playground-to-wordpress-com.zip playground-to-wordpress-com
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playground-to-wordpress-com
+          path: dist/playground-to-wordpress-com.zip
