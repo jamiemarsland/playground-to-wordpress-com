@@ -1,5 +1,5 @@
 import { storage, encrypt, decrypt } from './_shared/transfer-core.mts';
-import { listSites, newSites } from './_shared/new-site.mts';
+import { listSites, newSites, hasPaidPlan } from './_shared/new-site.mts';
 import { randomBytes, createCipheriv, createDecipheriv, createHash, timingSafeEqual } from 'node:crypto';
 
 export function env(key) { return Netlify.env.get(key); }
@@ -95,7 +95,8 @@ export default async function handler(req, context, getStorage = storage) {
         baseline=saved.ids;
       }
       if(!Array.isArray(baseline))return json({error:'Restart the new-site flow, or connect your already-created site using the existing-site option.'},409);
-      const candidates=newSites(await listSites(account.token),baseline,watch.started);
+      const currentSites=await listSites(account.token);
+      const candidates=newSites(currentSites,baseline,watch.started);
       const body=await req.json();
       const requested=body.siteId ? String(body.siteId) : watch.selected;
       if(requested && !candidates.some(s=>String(s.ID)===requested))return json({error:'The selected site is no longer a valid new destination.'},409);
@@ -105,8 +106,13 @@ export default async function handler(req, context, getStorage = storage) {
         return json({waiting:true,choices,message:'Several new sites appeared. Choose the destination for your Playground.'},200,[cookie('__Host-pgwpc-watch',updated,1800)]);
       }
       const site=requested ? candidates.find(s=>String(s.ID)===requested) : candidates[0];
-      if(!site)return json({waiting:true,message:'Waiting for your new WordPress.com site to appear…'});
-      if(!site.plan || site.plan.is_free!==false){
+      if(!site){
+        const unseen=currentSites.filter(s=>!baseline.includes(String(s.ID)));
+        return json({waiting:true,message:unseen.length
+          ? 'Found '+unseen.length+' new site(s), but creation date, hosting or administrator access is not confirmed yet. No import has started.'
+          : 'Checked '+currentSites.length+' sites. Waiting for a new site ID to appear in this account. No import has started.'});
+      }
+      if(!hasPaidPlan(site)){
         const updated=seal({...watch,...(requested ? {selected:String(site.ID)} : {})});
         return json({waiting:true,message:'Found '+site.URL+'. Waiting for paid hosting to be ready…'},200,[cookie('__Host-pgwpc-watch',updated,1800)]);
       }

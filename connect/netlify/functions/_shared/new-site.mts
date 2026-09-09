@@ -33,3 +33,10 @@ export async function listSites(token) {
   }
   throw new Error('Could not read the complete site list. No automatic transfer was started.');
 }
+
+export function hasPaidPlan(site) {
+  const plan=site.plan;
+  if(!plan || plan.expired===true || plan.is_free===true || plan.product_slug==='free_plan')return false;
+  if(plan.is_free===false)return true;
+  return typeof plan.product_slug==='string' && plan.product_slug.length>0;
+}

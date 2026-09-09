@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {newSites,listSites} from '../netlify/functions/_shared/new-site.mts';
+import {newSites,listSites,hasPaidPlan} from '../netlify/functions/_shared/new-site.mts';
 import handler,{seal,unseal} from '../netlify/functions/wordpress.mts';
 globalThis.Netlify={env:{get:()=> 'test'.repeat(16)}};
 const entries=new Map();
@@ -22,7 +22,7 @@ const prepared=await handle(req('prepare','',{name:'jamietest1'}));
 assert.equal(prepared.status,200);
 assert.ok(prepared.headers.get('set-cookie').length<1000);
 const watch=prepared.headers.get('set-cookie').split(';')[0];
-globalThis.fetch=async()=>Response.json({sites:[site],total:1});
+globalThis.fetch=async()=>Response.json({sites:[{...site,plan:{product_slug:'personal-bundle'}}],total:1});
 const ready=await handle(req('poll',watch));
 assert.equal((await ready.json()).ready,true);
 const other={...site,ID:789,URL:'https://other.wpcomstaging.com'};
@@ -45,3 +45,9 @@ assert.ok(record.baselineId);
 entries.clear();
 assert.equal((await handle(req('poll',watch))).status,400);
 console.log('PASS: ID baseline, assigned staging address, old-site exclusion, ambiguity selection, forged selection rejection, plan waiting and pagination.');
+
+assert.equal(hasPaidPlan({plan:{product_slug:'personal-bundle'}}),true);
+assert.equal(hasPaidPlan({plan:{product_slug:'free_plan'}}),false);
+assert.equal(hasPaidPlan({plan:{product_slug:'personal-bundle',expired:true}}),false);
+assert.equal(hasPaidPlan({plan:{}}),false);
+console.log('PASS: omitted is_free does not block a non-free plan; free, expired and unknown plans still wait.');
