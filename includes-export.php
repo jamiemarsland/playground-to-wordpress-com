@@ -33,6 +33,9 @@ function build_archive($content_dir, $database, $config, $site_url) {
             $relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($path, strlen($root) + 1));
             if ($path === $db || in_array($path, array($db . '-wal', $db . '-shm', $db . '-journal'), true)) { continue; }
             if (preg_match('#^(cache/|upgrade/|debug\.log$)#', $relative)) { continue; }
+            // Match the official exporter's reserved legacy runtime paths.
+            if (preg_match('#^mu-plugins/(sqlite-database-integration(/|$)|playground-includes(/|$)|0-playground\.php$|0-sqlite\.php$)#', $relative)) { continue; }
+            if ($relative === 'db.php' && strpos(file_get_contents($path), '@playground-managed') !== false) { continue; }
             if (!$zip->addFile($path, 'wp-content/' . $relative)) { throw new \RuntimeException('Cannot add file.'); }
         }
         $db_relative = str_replace(DIRECTORY_SEPARATOR, '/', substr($db, strlen($root) + 1));

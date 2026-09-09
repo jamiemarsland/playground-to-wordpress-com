@@ -4,6 +4,8 @@ A small WordPress plugin that adds **Move to WordPress.com** to the admin menu a
 
 ## Try it
 
+[Open the plugin in a fresh Playground](https://playground.wordpress.net/?blueprint-url=https%3A%2F%2Fraw.githubusercontent.com%2Fjamiemarsland%2Fplayground-to-wordpress-com%2Fmain%2Fblueprint.json). This demo link is provided for manual testing and has not been browser-verified.
+
 Download this repository using **Code → Download ZIP**, upload it in your Playground under **Plugins → Add New → Upload Plugin**, and activate it. Open **Move to WordPress.com** in the sidebar.
 
 The Actions workflow also produces an installable plugin ZIP, excluding the development files.
@@ -27,7 +29,7 @@ This is an experimental export helper, not a certified migration tool. A real Wo
 
 WordPress.com documents Playground ZIP imports, but that does not guarantee full-site restoration on a free plan. Its free content-only XML route does not bundle local media, and the importer cannot fetch files living only in your browser. XML is therefore not a reliable substitute for a complete Playground archive.
 
-The archive layout follows Playground's wp-content ZIP format with `playground-export.json` (formatVersion 2), plus a consistent SQLite snapshot. It currently retains runtime files present in older Playgrounds for inspection; test restoration on the target importer before relying on those archives. Non-standard database locations outside wp-content and multisite are deliberately unsupported.
+The archive layout follows Playground's wp-content ZIP format with `playground-export.json` (formatVersion 2), plus a consistent SQLite snapshot. Reserved legacy runtime files and Playground-managed database drop-ins are excluded in line with the official exporter; user-supplied must-use plugins and unmarked database drop-ins are retained. Non-standard database locations outside wp-content and multisite are deliberately unsupported.
 
 No destination plugin, WordPress.com API credentials, analytics, automatic publishing or automatic upload is required. The only outbound navigation is initiated by the user's links.
 

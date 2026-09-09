@@ -1,0 +1,20 @@
+{
+  "landingPage": "/wp-admin/admin.php?page=playground-to-wordpress-com",
+  "preferredVersions": {
+    "php": "8.2",
+    "wp": "latest"
+  },
+  "login": true,
+  "steps": [
+    {
+      "step": "installPlugin",
+      "pluginData": {
+        "resource": "url",
+        "url": "https://github.com/jamiemarsland/playground-to-wordpress-com/archive/refs/heads/main.zip"
+      },
+      "options": {
+        "activate": true
+      }
+    }
+  ]
+}
