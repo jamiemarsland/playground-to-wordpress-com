@@ -1,4 +1,4 @@
-import { listSites, selectNewSite, siteHost } from './_shared/new-site.mts';
+import { listSites, newSites } from './_shared/new-site.mts';
 import { randomBytes, createCipheriv, createDecipheriv, createHash, timingSafeEqual } from 'node:crypto';
 
 export function env(key) { return Netlify.env.get(key); }
@@ -64,7 +64,7 @@ export default async function handler(req) {
     const account = unseal(jar['__Host-pgwpc-account']);
     if (!account) return page('Sign in again','<p>Your connection expired.</p><a href="/?view=new">Restart</a>',401);
     const proof = seal({purpose:'watch',flow:account.flow,exp:account.exp});
-    if (url.pathname === '/new-site') return page('Choose your new site address',`<div id="new-site" data-proof="${escape(proof)}"><p>Use this same WordPress.com address during hosting setup. We will only transfer to this address if it is newly created.</p><form id="create"><label for="address">Site address</label><p><input id="address" required pattern="[a-z0-9][a-z0-9-]{2,50}" maxlength="51" placeholder="my-playground-site" autocomplete="off">.wordpress.com</p><p><label><input id="consent" type="checkbox" required> Automatically import my Playground into this new site when hosting is ready.</label></p><button id="create-button" disabled>Choose hosting and move my site</button></form><p id="new-status" role="status">Waiting for your Playground. Keep this window and Playground open.</p><p id="signup-link"></p><p><a href="/">Cancel and return</a></p></div><script src="/new-site.js" defer></script>`);
+    if (url.pathname === '/new-site') return page('Create your new site',`<div id="new-site" data-proof="${escape(proof)}"><p>We will detect the site created during this setup, including any address WordPress.com assigns. Create only one site during this transfer.</p><form id="create"><label for="address">Suggested site name</label><p><input id="address" required pattern="[a-z0-9][a-z0-9-]{2,50}" maxlength="51" placeholder="my-playground-site" autocomplete="off"></p><p><label><input id="consent" type="checkbox" required> Automatically import my Playground into this new site when hosting is ready.</label></p><button id="create-button" disabled>Choose hosting and move my site</button></form><p id="new-status" role="status">Waiting for your Playground. Keep this window and Playground open.</p><p id="signup-link"></p><p><a href="/">Cancel and return</a></p></div><script src="/new-site.js?v=site-ids-1" defer></script>`);
     const json = (body,status=200,values=[]) => { const h=headers();h.set('Content-Type','application/json');for(const v of values)h.append('Set-Cookie',v);return new Response(JSON.stringify(body),{status,headers:h}); };
     if (req.method !== 'POST') return json({error:'Use the setup form.'},405);
     const submitted = unseal(req.headers.get('x-pgwpc-watch'));
@@ -73,18 +73,31 @@ export default async function handler(req) {
       if (url.searchParams.get('action') === 'prepare') {
         const body = await req.json();
         if (typeof body.name !== 'string' || !/^[a-z0-9][a-z0-9-]{2,50}$/.test(body.name)) return json({error:'Enter a valid site address.'},400);
-        const expected = body.name + '.wordpress.com';
         const sites = await listSites(account.token);
-        if (sites.some(site=>siteHost(site.URL)===expected)) return json({error:'You already have this site. Choose a new address, or use the existing-site flow.'},409);
-        const watch=seal({expected,started:Date.now(),flow:account.flow,exp:account.exp});
+        const watch=seal({baseline:sites.map(s=>String(s.ID)),started:Date.now(),flow:account.flow,exp:account.exp});
+        if(watch.length>3800)return json({error:'This account has too many sites for automatic detection. Use the existing-site flow.'},400);
         const signup=new URL('https://wordpress.com/setup/new-hosted-site');
         signup.searchParams.set('showDomainStep','true');signup.searchParams.set('new',body.name);
-        return json({signup:signup.toString(),expected},200,[cookie('__Host-pgwpc-watch',watch,1800)]);
+        return json({signup:signup.toString()},200,[cookie('__Host-pgwpc-watch',watch,1800)]);
       }
       const watch=unseal(jar['__Host-pgwpc-watch']);
       if (!watch || watch.flow!==account.flow) return json({error:'Start hosting setup from this window first.'},400);
-      const site=selectNewSite(await listSites(account.token),watch.expected,watch.started);
-      if (!site) return json({waiting:true});
+      if(!Array.isArray(watch.baseline))return json({error:'This setup used an older version. Restart the new-site flow, or connect your already-created site using the existing-site option.'},409);
+      const candidates=newSites(await listSites(account.token),watch.baseline,watch.started);
+      const body=await req.json();
+      const requested=body.siteId ? String(body.siteId) : watch.selected;
+      if(requested && !candidates.some(s=>String(s.ID)===requested))return json({error:'The selected site is no longer a valid new destination.'},409);
+      const choices=candidates.map(s=>({id:String(s.ID),url:s.URL}));
+      if(!requested && candidates.length && (candidates.length>1 || watch.needsChoice)){
+        const updated=seal({...watch,needsChoice:true});
+        return json({waiting:true,choices,message:'Several new sites appeared. Choose the destination for your Playground.'},200,[cookie('__Host-pgwpc-watch',updated,1800)]);
+      }
+      const site=requested ? candidates.find(s=>String(s.ID)===requested) : candidates[0];
+      if(!site)return json({waiting:true,message:'Waiting for your new WordPress.com site to appear…'});
+      if(!site.plan || site.plan.is_free!==false){
+        const updated=seal({...watch,...(requested ? {selected:String(site.ID)} : {})});
+        return json({waiting:true,message:'Found '+site.URL+'. Waiting for paid hosting to be ready…'},200,[cookie('__Host-pgwpc-watch',updated,1800)]);
+      }
       const token=seal({token:account.token,siteId:site.ID,blog:site.URL,exp:account.exp});
       if(token.length>3800)throw new Error('Session too large.');
       return json({ready:true,blog:site.URL},200,[cookie('__Host-pgwpc-session',token,1800)]);
@@ -94,7 +107,7 @@ export default async function handler(req) {
     const session = unseal(jar['__Host-pgwpc-session']);
     if (session && url.searchParams.get('view') === 'transfer') return page('Move your Playground site',`<p>Destination: <strong id="destination">${escape(session.blog || 'your selected site')}</strong>.</p><p id="status" role="status" aria-live="polite">Open this window using the Move to WordPress.com button in your Playground.</p><progress id="progress" max="100" value="0" hidden style="width:100%"></progress><p id="source"></p><button id="transfer" disabled>Move my site here</button><p><small>This imports the Playground archive into the destination shown above and may replace existing content or settings. Use a new or disposable test site. The source Playground stays intact.</small></p><p><small>Your archive passes through encrypted temporary storage, which is deleted after upload or expires for scheduled cleanup.</small></p><p><a id="review" href="https://wordpress.com/import/${encodeURIComponent(String(session.siteId))}" target="_blank" rel="noopener noreferrer">Check import on WordPress.com</a></p><p><a href="/">Choose a different destination</a></p><form action="/disconnect" method="post"><input type="hidden" name="disconnect_token" value="${escape(seal({purpose:'disconnect',session:createHash('sha256').update(session.token).digest('hex'),exp:Math.min(session.exp,Date.now()+1800000)}))}"><button>Disconnect / choose another site</button></form>`,200,[],true);
     if (!ready()) return page('Finish connecting the app',`<p>Use this exact value in the WordPress.com application’s <strong>Redirect URLs</strong> field:</p><code>${callback()}</code><p>After registering, add the Client ID and Client Secret in this project’s Netlify environment settings. Keep the secret out of the plugin and GitHub.</p><p><a href="https://app.netlify.com/projects/playground-wpcom-connect/configuration/env">Open environment settings</a></p><small>The callback is hosted. WordPress.com sign-in will become available once the app credentials are configured.</small>`);
-    if (url.searchParams.get('view') === 'new') return page('Create and move your site',`<p>This experimental flow watches for your new WordPress.com site and transfers your Playground automatically once hosting is ready.</p><p>Sign in first. WordPress.com will ask for access across your account so we can find the new site. We only transfer to the new address you specify.</p><p>Full-site transfer requires a paid plan with plugin support.</p><a class="button" href="/oauth/wordpress/start?mode=new">Sign in to create and move</a><p><a href="/">Back</a></p>`);
+    if (url.searchParams.get('view') === 'new') return page('Create and move your site',`<p>This experimental flow watches for your new WordPress.com site and transfers your Playground automatically once hosting is ready.</p><p>Sign in first. WordPress.com will ask for access across your account so we can find the new site. We compare your sites before and after signup to find the new destination.</p><p>Full-site transfer requires a paid plan with plugin support.</p><a class="button" href="/oauth/wordpress/start?mode=new">Sign in to create and move</a><p><a href="/">Back</a></p>`);
     return page('Where should your site live?',`<p>Choose a destination for your Playground site. Nothing is uploaded until you confirm the transfer.</p><section><h2>Create a new site</h2><p>We’ll guide you through creating a site on WordPress.com, then connecting it here.</p><a class="button" href="/?view=new">Create a new site</a></section><section><h2>Use an existing site</h2><p>Sign in to WordPress.com and select a site you already own. Use a new or disposable site for testing.</p><a class="button" href="/oauth/wordpress/start">Use an existing site</a></section>${session ? `<section><h2>Already connected</h2><p>${escape(session.blog || 'Your selected site')}</p><a class="button" href="/?view=transfer">Continue with this site</a></section>` : ''}<p><small>Full-site transfer requires a WordPress.com plan that supports plugins. Free content-only transfer is not available in this version.</small></p>`);
   }
   if (url.pathname === '/oauth/wordpress/start') {
