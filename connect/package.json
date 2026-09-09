@@ -5,6 +5,6 @@
   },
   "private": true,
   "scripts": {
-    "test": "node tests/transfer.mts && node tests/disconnect.mts && node tests/destination.mts"
+    "test": "node tests/transfer.mts && node tests/disconnect.mts && node tests/destination.mts && node tests/new-site.mts"
   }
 }

@@ -65,6 +65,12 @@ GPL-2.0-or-later.
 
 ### Choosing a destination
 
-The hosted connection window now offers **Create a new site** and **Use an existing site**. New-site creation opens WordPress.com’s hosting-only route (`/setup/new-hosted-site`) in a separate tab, avoiding the standard design onboarding. After checkout and provisioning, return from the site dashboard to the connection window. Keep the Playground and connection window open, finish creating the destination, then return and click **I’ve created my site. Connect it**. Select the new site during authorisation and review it before starting the transfer.
+The existing-site flow continues to use single-site authorisation and an explicit transfer button.
 
-Returning users can continue with their connected site or choose another destination. Creation is guided, not performed through an API. The current full-archive transfer requires a compatible WordPress.com plan with plugin support; this version does not provide free content-only transfer.
+The experimental new-site flow signs in with OAuth `global` permission before signup. The user specifies a new `.wordpress.com` address and consents to automatic import. The hosting-only signup opens separately with the suggested name and domain step enabled. Keep both windows and Playground open, use the same WordPress.com account, and choose that exact address.
+
+The connection window polls the authenticated site list every five seconds for up to 20 minutes. It only accepts the exact hostname with a creation date after setup started, administrator access, and a non-free plan. An existing address is rejected before signup; missing creation data and ambiguous matches stop the flow. It does not guess if signup assigns another address. The existing import preflight checks still run before uploading.
+
+After matching, a short-lived, one-use browser intent ties automatic export to the originating Playground channel and destination. Refreshing the transfer page does not automatically repeat it. OAuth denial, expiry, popup blocking, API failure and timeout are reported. A blocked popup has an explicit hosting link.
+
+This removes the manual reconnect step, but does not control WordPress.com's checkout tab or bring it back automatically. The full checkout/poll/import sequence still needs a live end-to-end test. Free content-only transfer is not supported.

@@ -3,6 +3,13 @@
   if(!button)return;
   let source=null,sourceOrigin=null,channel=null,csrf=null,busy=false,waiting=false;
   const say=message=>{status.textContent=message;if(source)source.postMessage({type:'pgwpc:status',channel,message},sourceOrigin);};
+  let automatic=null;
+  try { automatic=JSON.parse(sessionStorage.getItem('pgwpc-auto')); } catch {}
+  function maybeStart() {
+    if(!automatic || !source || !csrf || busy)return;
+    const intent=automatic;automatic=null;sessionStorage.removeItem('pgwpc-auto');
+    if(intent.exp>Date.now() && intent.channel===channel && intent.blog===document.getElementById('destination')?.textContent) button.click();
+  }
   const allowed=value=>value==='https://playground.wordpress.net';
   window.addEventListener('message',async event=>{
     if(!allowed(event.origin)||event.source!==window.opener)return;
@@ -12,6 +19,7 @@
       source=event.source;sourceOrigin=event.origin;channel=data.channel;
       document.getElementById('source').textContent='Source: '+String(data.title||'Your Playground').slice(0,200);
       if(csrf)button.disabled=false;
+      maybeStart();
       return;
     }
     if(event.source!==source||data?.channel!==channel)return;
@@ -63,5 +71,6 @@
     csrf=data.csrf;
     say(source?'Ready. Check the destination above, then click Move my site here.':'Return to Playground and click Connect and move my site to link this window.');
     button.disabled=!source;
+    maybeStart();
   }).catch(error=>say(error.message));
 })();

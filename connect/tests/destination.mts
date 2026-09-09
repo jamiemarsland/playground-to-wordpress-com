@@ -10,10 +10,8 @@ for(const headers of [{},{cookie}]){
  if(headers.cookie)assert.match(html,/Continue with this site/);
 }
 const guide=await (await handler(new Request(base+'/?view=new',{headers:{cookie}}))).text();
-assert.match(guide,/https:\/\/wordpress.com\/setup\/new-hosted-site/);
-assert.match(guide,/target="_blank" rel="noopener noreferrer"/);
-assert.match(guide,/Free content-only transfer is not available/);
-assert.match(guide,/I’ve created my site/);
+assert.match(guide,/mode=new/);
+assert.match(guide,/access across your account/);
 const start=await handler(new Request(base+'/oauth/wordpress/start'));
 const target=new URL(start.headers.get('location'));
 assert.equal(target.hostname,'public-api.wordpress.com');
