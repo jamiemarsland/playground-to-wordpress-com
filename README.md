@@ -10,7 +10,17 @@ Download this repository using **Code → Download ZIP**, upload it in your Play
 
 The Actions workflow also produces an installable plugin ZIP, excluding the development files.
 
-## What version 0.1.0 does
+## Automatic transfer (0.2.0)
+
+Open **Move to WordPress.com → Connect and move my site** in the official Playground. Sign in, check the destination in the connection window, and click **Move my site here**. Keep both windows open. The plugin exports in the browser and sends the archive to the connection window using origin-checked messages; no manual file handling is required.
+
+Archives up to 100 MB are uploaded in 2 MB chunks to encrypted temporary Netlify storage, then submitted to WordPress.com. Each transfer is tied to the authenticated destination. Conditional writes prevent duplicate submission, and uncertain requests are never automatically repeated. Chunks are deleted after submission attempts; abandoned transfers are scheduled for hourly cleanup after one hour.
+
+The importer is checked before upload. Known free plans are rejected for ZIP transfer. This implementation does not bypass plan restrictions or offer automatic content-only migration to free sites. The destination may have its content or settings replaced, so test on a disposable site.
+
+The connection service is hosted at https://playground-wpcom-connect.netlify.app. It holds OAuth credentials on the server and never sends WordPress.com tokens to Playground. See `connect/` for the service and its tests.
+
+## Export features
 
 - Flags regular active plugins and explains the limits of free hosting.
 - Checks SQLite, ZIP and single-site prerequisites before offering export.
@@ -25,13 +35,13 @@ The ZIP is a full site backup and can contain private content and credentials. O
 
 ## What is not yet verified
 
-This is an experimental export helper, not a certified migration tool. A real WordPress.com import has **not yet been tested**. Free-plan ZIP acceptance, media mapping, theme availability, templates, global styles and plugin-dependent content must be checked in an actual destination account. The plugin never claims the move is complete.
+This is an experimental export helper, not a certified migration tool. Live OAuth sign-in has been verified by the user. A real WordPress.com archive import through the third-party OAuth app has **not yet been tested**; API access may still be rejected by WordPress.com. Free-plan ZIP acceptance, media mapping, theme availability, templates, global styles and plugin-dependent content must be checked in an actual destination account. The plugin never claims the move is complete.
 
 WordPress.com documents Playground ZIP imports, but that does not guarantee full-site restoration on a free plan. Its free content-only XML route does not bundle local media, and the importer cannot fetch files living only in your browser. XML is therefore not a reliable substitute for a complete Playground archive.
 
 The archive layout follows Playground's wp-content ZIP format with `playground-export.json` (formatVersion 2), plus a consistent SQLite snapshot. Reserved legacy runtime files and Playground-managed database drop-ins are excluded in line with the official exporter; user-supplied must-use plugins and unmarked database drop-ins are retained. Non-standard database locations outside wp-content and multisite are deliberately unsupported.
 
-No destination plugin, WordPress.com API credentials, analytics, automatic publishing or automatic upload is required. The only outbound navigation is initiated by the user's links.
+No destination plugin or analytics is added. The manual fallback needs no credentials. Automatic transfer uses the separately hosted OAuth service and begins only after the user selects the transfer action in that window.
 
 ## Validation
 

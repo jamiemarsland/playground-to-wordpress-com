@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Playground to WordPress.com
  * Description: Export your Playground site and follow a guided handoff to WordPress.com.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires at least: 6.5
  * Requires PHP: 8.0
  * Author: Jamie Marsland
@@ -20,7 +20,8 @@ add_action('admin_menu', function () {
 });
 add_action('admin_enqueue_scripts', function ($hook) {
     if ($hook === 'toplevel_page_playground-to-wordpress-com') {
-        wp_enqueue_style('pgwpc', plugins_url('assets/admin.css', __FILE__), array(), '0.1.0');
+        wp_enqueue_script('pgwpc-transfer', plugins_url('assets/transfer.js', __FILE__), array(), '0.2.0', true);
+        wp_enqueue_style('pgwpc', plugins_url('assets/admin.css', __FILE__), array(), '0.2.0');
     }
 });
 add_action('admin_bar_menu', function ($bar) {
@@ -54,8 +55,13 @@ function render() {
     <div class="wrap pgwpc">
         <div class="pgwpc-hero"><span class="pgwpc-eyebrow">FROM EXPERIMENT TO WEBSITE</span>
         <h1>Give your Playground a home.</h1>
-        <p>Download your site, then take it to WordPress.com.<br>Keep this tab open while you finish the move.</p>
+        <p>Connect WordPress.com and send your site directly.<br>Keep this Playground open while the transfer runs.</p>
         <span class="pgwpc-badge">Guided transfer · Preview version</span></div>
+        <section class="pgwpc-card"><h2>Move your site automatically</h2>
+        <p>Sign in, check the destination, then click Move my site here. Your archive is sent automatically, with no manual download or upload.</p>
+        <?php if (!$issues) : ?><button id="pgwpc-connect" class="button button-primary button-hero" data-title="<?php echo esc_attr(get_bloginfo('name')); ?>" data-export-url="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-nonce="<?php echo esc_attr(wp_create_nonce('pgwpc_export')); ?>">Connect and move my site</button><?php endif; ?>
+        <p id="pgwpc-transfer-status" role="status" aria-live="polite">Use a new or disposable destination site. Importing can replace its content or settings. ZIP imports may require a paid WordPress.com plan.</p>
+        <p class="pgwpc-small">Currently supports the official playground.wordpress.net host. Keep the connection window open throughout.</p></section>
         <section class="pgwpc-card"><h2><span class="pgwpc-number">1</span> Check your site</h2>
         <p><strong><?php echo esc_html(get_bloginfo('name')); ?></strong> · Theme: <?php echo esc_html($theme->get('Name')); ?></p>
         <p>Free hosting can be a good starting point for pages and posts. It cannot run installed plugins. Your theme, layouts and images need checking after import; this tool cannot certify free-plan compatibility.</p>
@@ -65,19 +71,19 @@ function render() {
         <?php else : ?><p class="pgwpc-note">No regular active plugins found apart from this helper. Custom code, must-use plugins and theme availability still need checking.</p><?php endif; ?>
         <p><a href="https://wordpress.com/support/plan-features/" target="_blank" rel="noopener noreferrer">Compare WordPress.com plans ↗</a></p>
         </section>
-        <section class="pgwpc-card"><h2><span class="pgwpc-number">2</span> Download your site</h2>
+        <details class="pgwpc-card"><summary>Manual export and import fallback</summary><h2>Download your site</h2>
         <p>The ZIP contains your database, uploads, themes, plugins and configuration. Keep it private: it can contain drafts, account details and plugin settings.</p>
         <?php foreach ($issues as $issue) : ?><p class="pgwpc-note" role="alert"><?php echo esc_html($issue); ?></p><?php endforeach; ?>
         <?php if (!$issues) : ?><form action="<?php echo esc_url(admin_url('admin-post.php')); ?>" method="post">
         <input type="hidden" name="action" value="pgwpc_export"><?php wp_nonce_field('pgwpc_export'); ?>
         <button class="button button-primary button-hero" type="submit">Download my site (.zip)</button>
         </form><?php endif; ?>
-        <p class="pgwpc-small">Wait for the download to finish before continuing. If it fails, use Playground’s built-in Export → Download as .zip. Large sites may exceed browser memory.</p></section>
-        <section class="pgwpc-card"><h2><span class="pgwpc-number">3</span> Move into WordPress.com</h2>
+        <p class="pgwpc-small">Wait for the download to finish before continuing. If it fails, use Playground’s built-in Export → Download as .zip. Large sites may exceed browser memory.</p>
+        <section><h2>Move into WordPress.com</h2>
         <ol><li>Open WordPress.com below and sign in or create an account.</li><li>Follow the import setup and upload the ZIP you downloaded.</li><li>Choose a free address and plan if offered for your import. If a paid plan is required, pause and check the import guide before proceeding.</li></ol>
         <a class="button button-primary button-hero" href="https://wordpress.com/setup/migration-signup" target="_blank" rel="noopener noreferrer">Continue to WordPress.com ↗</a>
         <p class="pgwpc-small">Opens a new tab. No file is uploaded until you select it on WordPress.com.</p>
-        <details><summary>Need the free content-only route?</summary><p>WordPress.com supports content-only imports on free sites. Tools → Export can produce an XML file, but that file does not contain your image files or theme. Images stored only in Playground are not publicly reachable by the importer, so an XML-only move may require uploading and reconnecting them manually.</p><a href="https://wordpress.com/support/import/" target="_blank" rel="noopener noreferrer">Read the import guide ↗</a></details></section>
+        <details><summary>Need the free content-only route?</summary><p>WordPress.com supports content-only imports on free sites. Tools → Export can produce an XML file, but that file does not contain your image files or theme. Images stored only in Playground are not publicly reachable by the importer, so an XML-only move may require uploading and reconnecting them manually.</p><a href="https://wordpress.com/support/import/" target="_blank" rel="noopener noreferrer">Read the import guide ↗</a></details></section></details>
         <section class="pgwpc-card"><h2>Before you call it home</h2><p>Compare the imported site with your Playground. Check:</p>
         <?php foreach (array('Pages and posts, including drafts', 'Images and galleries', 'Homepage, navigation and links', 'Theme, colours, fonts and layouts', 'Forms, shop features and other plugin blocks') as $label) : ?><label class="pgwpc-check"><input type="checkbox"> <?php echo esc_html($label); ?></label><?php endforeach; ?>
         <p class="pgwpc-small">These are your review notes, not automatic checks. Keep your original Playground and ZIP until everything looks right.</p></section>

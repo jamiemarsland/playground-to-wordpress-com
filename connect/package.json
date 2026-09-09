@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@netlify/blobs": "^11.0.3",
+    "@netlify/functions": "^6.0.0"
+  },
+  "private": true,
+  "scripts": {
+    "test": "node tests/transfer.mts"
+  }
+}

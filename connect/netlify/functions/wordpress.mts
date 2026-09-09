@@ -1,9 +1,9 @@
 import { randomBytes, createCipheriv, createDecipheriv, createHash, timingSafeEqual } from 'node:crypto';
 
-function env(key) { return Netlify.env.get(key); }
-function origin() { return 'https://playground-wpcom-connect.netlify.app'; }
+export function env(key) { return Netlify.env.get(key); }
+export function origin() { return 'https://playground-wpcom-connect.netlify.app'; }
 function callback() { return origin() + '/oauth/wordpress/callback'; }
-function key() {
+export function key() {
   const secret = env('SESSION_SECRET');
   if (!secret || secret.length < 32) throw new Error('Missing session key');
   return createHash('sha256').update(secret).digest();
@@ -24,18 +24,18 @@ export function unseal(value) {
     return data.exp > Date.now() ? data : null;
   } catch { return null; }
 }
-function cookies(req) {
+export function cookies(req) {
   return Object.fromEntries((req.headers.get('cookie') || '').split(';').map(x => x.trim().split(/=(.*)/s)).filter(x => x[0]).map(x => [x[0], x[1]]));
 }
 function cookie(name, value, age) { return `${name}=${value}; Path=/; Max-Age=${age}; HttpOnly; Secure; SameSite=Lax`; }
 function escape(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function headers() {
-  return new Headers({'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"});
+  return new Headers({'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"});
 }
-function page(title, body, status = 200, extra = []) {
+function page(title, body, status = 200, extra = [], bridge = false) {
   const h = headers(); h.set('Content-Type','text/html; charset=utf-8');
   for (const value of extra) h.append('Set-Cookie', value);
-  return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)} | Playground Connect</title><style>body{font:17px/1.65 system-ui,sans-serif;background:#f0f4f6;color:#142b33;margin:0;padding:8vh 20px}main{max-width:620px;margin:auto;background:white;padding:38px;border-radius:16px;border-top:5px solid #155b4b}h1{font-size:30px;line-height:1.2}a{color:#155b4b}button,.button{display:inline-block;background:#155b4b;color:white;padding:12px 20px;border:0;border-radius:6px;font:inherit;text-decoration:none;cursor:pointer}code{display:block;background:#eef3f1;padding:16px;overflow-wrap:anywhere;font-size:14px}small{color:#52635e}a:focus-visible,button:focus-visible{outline:3px solid #a66b00;outline-offset:4px}</style><main><small>PLAYGROUND TO WORDPRESS.COM</small><h1>${escape(title)}</h1>${body}</main></html>`,{status,headers:h});
+  return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)} | Playground Connect</title><style>body{font:17px/1.65 system-ui,sans-serif;background:#f0f4f6;color:#142b33;margin:0;padding:8vh 20px}main{max-width:620px;margin:auto;background:white;padding:38px;border-radius:16px;border-top:5px solid #155b4b}h1{font-size:30px;line-height:1.2}a{color:#155b4b}button,.button{display:inline-block;background:#155b4b;color:white;padding:12px 20px;border:0;border-radius:6px;font:inherit;text-decoration:none;cursor:pointer}code{display:block;background:#eef3f1;padding:16px;overflow-wrap:anywhere;font-size:14px}small{color:#52635e}a:focus-visible,button:focus-visible{outline:3px solid #a66b00;outline-offset:4px}</style><main><small>PLAYGROUND TO WORDPRESS.COM</small><h1>${escape(title)}</h1>${body}</main>${bridge ? '<script src="/transfer.js" defer></script>' : ''}</html>`,{status,headers:h});
 }
 function redirect(path, values = []) {
   const h = headers(); h.set('Location', path);
@@ -54,7 +54,7 @@ export default async function handler(req) {
   }
   if (url.pathname === '/') {
     const session = unseal(jar['__Host-pgwpc-session']);
-    if (session) return page('WordPress.com is connected',`<p>Connected to <strong>${escape(session.blog || 'your selected site')}</strong>.</p><p>Sign-in is complete. Automatic site transfer is not enabled yet; no content has been uploaded.</p><form action="/disconnect" method="post"><button>Disconnect</button></form>`);
+    if (session) return page('Move your Playground site',`<p>Destination: <strong>${escape(session.blog || 'your selected site')}</strong>.</p><p id="status" role="status" aria-live="polite">Open this window using the Move to WordPress.com button in your Playground.</p><progress id="progress" max="100" value="0" hidden style="width:100%"></progress><p id="source"></p><button id="transfer" disabled>Move my site here</button><p><small>This imports the Playground archive into the destination shown above and may replace existing content or settings. Use a new or disposable test site. The source Playground stays intact.</small></p><p><small>Your archive passes through encrypted temporary storage, which is deleted after upload or expires for scheduled cleanup.</small></p><p><a id="review" href="https://wordpress.com/import/${encodeURIComponent(String(session.siteId))}" target="_blank" rel="noopener noreferrer">Check import on WordPress.com</a></p><form action="/disconnect" method="post"><button>Disconnect / choose another site</button></form>`,200,[],true);
     if (!ready()) return page('Finish connecting the app',`<p>Use this exact value in the WordPress.com application’s <strong>Redirect URLs</strong> field:</p><code>${callback()}</code><p>After registering, add the Client ID and Client Secret in this project’s Netlify environment settings. Keep the secret out of the plugin and GitHub.</p><p><a href="https://app.netlify.com/projects/playground-wpcom-connect/configuration/env">Open environment settings</a></p><small>The callback is hosted. WordPress.com sign-in will become available once the app credentials are configured.</small>`);
     return page('Connect WordPress.com','<p>Sign in and choose the site you want to connect. This step does not upload or publish anything.</p><a class="button" href="/oauth/wordpress/start">Connect WordPress.com</a>');
   }

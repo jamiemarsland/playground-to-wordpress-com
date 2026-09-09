@@ -4,7 +4,7 @@ Netlify project: `playground-wpcom-connect`.
 
 Redirect URL: `https://playground-wpcom-connect.netlify.app/oauth/wordpress/callback`
 
-This small service implements the authorisation-code sign-in callback. It is the prerequisite for automatic transfers, not the transfer implementation itself. No content is uploaded or published by this service yet.
+This small service implements the authorisation-code sign-in callback. It supports automatic Playground archive transfers via an authenticated popup. Transfers require an explicit destination confirmation in that popup.
 
 ## Configuration
 
@@ -22,6 +22,14 @@ The connection endpoints use expiring encrypted state cookies, state comparison,
 - `/disconnect`: same-origin POST to clear the session.
 - `/health`: service and configuration status, no secrets.
 
-## Next implementation
+## Transfer behaviour
 
-Connect the Playground plugin to this service, verify import permissions and plan compatibility, then implement an explicit transfer request with progress. Do not claim migration success from OAuth success.
+The updated plugin exports a ZIP through its nonce-protected endpoint and passes it to this window via postMessage, pinned to the service origin and popup window. Only messages from the official Playground origin and opener are accepted.
+
+`/api/connection` checks site and importer access. `/api/transfer` requires a valid encrypted session, same-origin POST and session-bound CSRF value. It handles prepare, immutable encrypted chunk uploads, a conditionally locked single submission, status and import advancement. Job ownership derives from the site-bound OAuth token. API tokens never reach Playground or browser JavaScript.
+
+WordPress.com requests mirror Calypso’s import actions (`rest/v1.1/sites/{siteId}/imports/new`, `/imports/`, `/imports/{importId}`). Third-party OAuth permission for these endpoints still needs a real user-run transfer test. Known free plans are blocked. Unsupported archive classification and uncertain network outcomes stop for review; success is shown only for the matching remote `importSuccess` state.
+
+Netlify Blobs uses strong consistency and conditional writes provided by the pinned SDK. Chunks are removed after submission attempts. An hourly scheduled function removes abandoned jobs and chunks older than one hour. Cleanup can be delayed by hosting outages. Preview deployments use separate deploy-scoped storage.
+
+Run `npm ci && npm test` using Node 24 for mocked API and safety tests. The service build runs on Netlify’s Node 22 environment.

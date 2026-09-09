@@ -12,6 +12,13 @@ jobs:
           php-version: '8.2'
           extensions: zip, pdo_sqlite
           coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install connection dependencies
+        run: npm ci --prefix connect
+      - name: Transfer safety and API tests
+        run: npm test --prefix connect
       - name: PHP syntax
         run: find . -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Archive behaviour
