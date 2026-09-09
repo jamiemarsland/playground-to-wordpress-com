@@ -61,3 +61,10 @@ Manual acceptance test: create a Playground with a page, an uploaded image, a na
 - https://github.com/WordPress/wordpress-playground/blob/trunk/packages/playground/blueprints/src/lib/steps/zip-wp-content.ts
 
 GPL-2.0-or-later.
+
+
+### Choosing a destination
+
+The hosted connection window now offers **Create a new site** and **Use an existing site**. New-site creation opens WordPress.com in a separate tab. Keep the Playground and connection window open, finish creating the destination, then return and click **I’ve created my site. Connect it**. Select the new site during authorisation and review it before starting the transfer.
+
+Returning users can continue with their connected site or choose another destination. Creation is guided, not performed through an API. The current full-archive transfer requires a compatible WordPress.com plan with plugin support; this version does not provide free content-only transfer.

@@ -4,7 +4,7 @@ globalThis.Netlify={env:{get:()=> 'test'.repeat(16)}};
 const base='https://playground-wpcom-connect.netlify.app';
 const session={token:'test-token',siteId:123,exp:Date.now()+60000};
 const cookie='__Host-pgwpc-session='+seal(session);
-const page=await handler(new Request(base,{headers:{cookie}}));
+const page=await handler(new Request(base+'/?view=transfer',{headers:{cookie}}));
 const html=await page.text();
 const token=html.match(/name="disconnect_token" value="([^"]+)"/)[1];
 for(const origin of [null,'null',base]){
