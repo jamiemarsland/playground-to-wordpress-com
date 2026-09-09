@@ -1,3 +1,4 @@
+import { storage, encrypt, decrypt } from './_shared/transfer-core.mts';
 import { listSites, newSites } from './_shared/new-site.mts';
 import { randomBytes, createCipheriv, createDecipheriv, createHash, timingSafeEqual } from 'node:crypto';
 
@@ -44,7 +45,7 @@ function redirect(path, values = []) {
   return new Response(null,{status:303,headers:h});
 }
 function ready() { return Boolean(env('WPCOM_CLIENT_ID') && env('WPCOM_CLIENT_SECRET') && env('SESSION_SECRET')); }
-export default async function handler(req) {
+export default async function handler(req, context, getStorage = storage) {
   const url = new URL(req.url);
   const jar = cookies(req);
   if (req.method !== 'GET' && !(req.method === 'POST' && ['/disconnect','/api/new-site'].includes(url.pathname))) return page('Method not allowed','<p>Return to the connection page.</p>',405);
@@ -74,16 +75,27 @@ export default async function handler(req) {
         const body = await req.json();
         if (typeof body.name !== 'string' || !/^[a-z0-9][a-z0-9-]{2,50}$/.test(body.name)) return json({error:'Enter a valid site address.'},400);
         const sites = await listSites(account.token);
-        const watch=seal({baseline:sites.map(s=>String(s.ID)),started:Date.now(),flow:account.flow,exp:account.exp});
-        if(watch.length>3800)return json({error:'This account has too many sites for automatic detection. Use the existing-site flow.'},400);
+        const baselineId=randomBytes(16).toString('hex');
+        const baseline={ids:sites.map(s=>String(s.ID)),flow:account.flow,exp:account.exp};
+        await getStorage(context).set('baselines/'+baselineId,encrypt(Buffer.from(JSON.stringify(baseline))),{metadata:{exp:account.exp}});
+        const watch=seal({baselineId,started:Date.now(),flow:account.flow,exp:account.exp});
         const signup=new URL('https://wordpress.com/setup/new-hosted-site');
         signup.searchParams.set('showDomainStep','true');signup.searchParams.set('new',body.name);
         return json({signup:signup.toString()},200,[cookie('__Host-pgwpc-watch',watch,1800)]);
       }
       const watch=unseal(jar['__Host-pgwpc-watch']);
       if (!watch || watch.flow!==account.flow) return json({error:'Start hosting setup from this window first.'},400);
-      if(!Array.isArray(watch.baseline))return json({error:'This setup used an older version. Restart the new-site flow, or connect your already-created site using the existing-site option.'},409);
-      const candidates=newSites(await listSites(account.token),watch.baseline,watch.started);
+      let baseline=watch.baseline;
+      if(watch.baselineId){
+        if(!/^[a-f0-9]{32}$/.test(watch.baselineId))throw new Error('Invalid setup reference.');
+        const bytes=await getStorage(context).get('baselines/'+watch.baselineId,{type:'arrayBuffer'});
+        if(!bytes)throw new Error('Setup has expired. Restart the new-site flow.');
+        const saved=JSON.parse(decrypt(bytes).toString());
+        if(saved.flow!==account.flow || saved.exp<=Date.now())throw new Error('Setup has expired or belongs to another connection.');
+        baseline=saved.ids;
+      }
+      if(!Array.isArray(baseline))return json({error:'Restart the new-site flow, or connect your already-created site using the existing-site option.'},409);
+      const candidates=newSites(await listSites(account.token),baseline,watch.started);
       const body=await req.json();
       const requested=body.siteId ? String(body.siteId) : watch.selected;
       if(requested && !candidates.some(s=>String(s.ID)===requested))return json({error:'The selected site is no longer a valid new destination.'},409);

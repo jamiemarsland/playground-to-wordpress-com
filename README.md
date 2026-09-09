@@ -69,7 +69,7 @@ Existing-site transfers use single-site authorisation and an explicit transfer b
 
 The experimental new-site flow requests account-wide OAuth access, records the complete existing site ID list before signup, and polls for new IDs. Suggested names are optional hints to WordPress.com; assigned wpcomstaging.com addresses and different names do not block detection.
 
-Candidates must be newly created since this setup began, absent from the baseline, hosted on WordPress.com, and administrable by the signed-in user. With one candidate and a paid plan, the existing import checks and automatic transfer begin. Multiple candidates require an explicit choice, validated on the server. Free plans wait for paid hosting. Incomplete lists and oversized baseline cookies stop rather than guess.
+Candidates must be newly created since this setup began, absent from the baseline, hosted on WordPress.com, and administrable by the signed-in user. With one candidate and a paid plan, the existing import checks and automatic transfer begin. Multiple candidates require an explicit choice, validated on the server. Free plans wait for paid hosting. The baseline is encrypted in server-side storage with session ownership and expiry checks. Cookies hold only a small random reference. Incomplete lists stop rather than guess. Expired baselines are removed by scheduled cleanup.
 
 Keep Playground and the connection window open and create only one destination during this session. This detection cannot prove that an unrelated new site was created by the signup tab, so avoid creating sites elsewhere concurrently. A one-use browser intent binds automatic export to the original Playground channel and destination. Refreshing does not automatically repeat the transfer.
 
