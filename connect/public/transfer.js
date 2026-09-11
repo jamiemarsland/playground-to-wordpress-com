@@ -17,7 +17,7 @@
     if(data?.type==='pgwpc:hello'&&!busy) {
       if(channel&&channel!==data.channel)return;
       source=event.source;sourceOrigin=event.origin;channel=data.channel;
-      document.getElementById('source').textContent='Source: '+String(data.title||'Your Playground').slice(0,200);
+      document.getElementById('source').textContent='Sending: '+String(data.title||'Your site').slice(0,200);
       if(csrf)button.disabled=false;
       maybeStart();
       return;
@@ -43,23 +43,23 @@
   async function watch(id) {
     for(let n=0;n<180;n++) {
       const job=await api('advance',id);
-      if(job.complete){progress.hidden=true;say('Your site has moved to WordPress.com.');finish();return;}
+      if(job.complete){progress.hidden=true;say('Your site is live on WordPress.com.');finish();return;}
       if(job.failed||['failed','needs-review'].includes(job.phase))throw new Error(job.message||'WordPress.com stopped this import. Open its importer to review the result.');
       if(!job.importId)throw new Error('The upload result is not confirmed. Check the import on WordPress.com before starting another transfer.');
-      say(job.state==='uploadProcessing'?'WordPress.com is processing the archive…':'WordPress.com is importing your site…');
+      say(job.state==='uploadProcessing'?'WordPress.com is unpacking it…':'WordPress.com is setting your site up…');
       await new Promise(resolve=>setTimeout(resolve,5000));
     }
     say('The import is still running. Use “Check import on WordPress.com” to follow it. Do not start another transfer.');
   }
   async function upload(file) {
     try {
-      say('Preparing secure upload…');const job=await api('prepare',null,JSON.stringify({size:file.size}));
+      say('Getting ready…');const job=await api('prepare',null,JSON.stringify({size:file.size}));
       progress.hidden=false;
       for(let i=0;i<job.chunks;i++) {
         await api('chunk',job.id,file.slice(i*job.chunkSize,(i+1)*job.chunkSize),'&index='+i);
-        progress.value=Math.round((i+1)/job.chunks*100);say('Uploading your archive: '+progress.value+'%');
+        progress.value=Math.round((i+1)/job.chunks*100);say('Sending your site: '+progress.value+'%');
       }
-      progress.removeAttribute('value');say('Sending the archive to WordPress.com…');
+      progress.removeAttribute('value');say('Handing it to WordPress.com…');
       let result;
       try{result=await api('finish',job.id);}catch(error){
         // Never repeat a possibly accepted upload after a network failure.
