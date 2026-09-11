@@ -1,5 +1,20 @@
 (() => {
   const button=document.getElementById('transfer'), status=document.getElementById('status'),progress=document.getElementById('progress');
+  const stepList=document.getElementById('steps');
+  const ORDER=['pack','send','unpack','setup'];
+  function step(at,note) {
+    if(!stepList)return;
+    stepList.hidden=false;
+    const here=ORDER.indexOf(at);
+    ORDER.forEach((name,i)=>{
+      const li=stepList.querySelector('[data-step="'+name+'"]');
+      if(!li)return;
+      li.classList.toggle('was',i<here);
+      li.classList.toggle('now',i===here);
+      const n=li.querySelector('.note');
+      if(n)n.textContent=i<here?'done':(i===here?(note||''):'');
+    });
+  }
   if(!button)return;
   let source=null,sourceOrigin=null,channel=null,csrf=null,busy=false,waiting=false;
   const say=message=>{status.textContent=message;if(source)source.postMessage({type:'pgwpc:status',channel,message},sourceOrigin);};
@@ -35,6 +50,9 @@
   function finish() {
     const done=document.getElementById('done');
     if(done)done.hidden=false;
+    if(stepList)stepList.hidden=true;
+    progress.hidden=true;
+    status.hidden=true;
     button.hidden=true;
     const review=document.getElementById('review');
     if(review)review.parentElement.hidden=true;
@@ -59,11 +77,12 @@
     const began=Date.now();
     for(let n=0;n<360;n++) {
       const job=await api('advance',id);
-      if(job.complete){progress.hidden=true;say('Your site is live on WordPress.com.');finish();return;}
+      if(job.complete){progress.hidden=true;step('done');say('');finish();return;}
       if(job.failed||['failed','needs-review'].includes(job.phase))throw new Error(job.message||'WordPress.com stopped this import. Open its importer to review the result.');
       if(!job.importId)throw new Error('The upload result is not confirmed. Check the import on WordPress.com before starting another transfer.');
-      const doing=job.state==='uploadProcessing'?'WordPress.com is unpacking it':'WordPress.com is setting your site up';
-      say(doing+'… '+spell(Date.now()-began)+'. You can watch it on WordPress.com; this keeps checking either way.');
+      const where=job.state==='uploadProcessing'?'unpack':'setup';
+      step(where,spell(Date.now()-began));
+      say('This takes a few minutes. Leave this window open and it will tell you when your site is ready.');
       await waitOrWake(5000);
     }
     progress.hidden=true;
@@ -71,13 +90,13 @@
   }
   async function upload(file) {
     try {
-      say('Getting ready…');const job=await api('prepare',null,JSON.stringify({size:file.size}));
+      step('send');say('Sending your site to WordPress.com…');const job=await api('prepare',null,JSON.stringify({size:file.size}));
       progress.hidden=false;
       for(let i=0;i<job.chunks;i++) {
         await api('chunk',job.id,file.slice(i*job.chunkSize,(i+1)*job.chunkSize),'&index='+i);
-        progress.value=Math.round((i+1)/job.chunks*100);say('Sending your site: '+progress.value+'%');
+        progress.value=Math.round((i+1)/job.chunks*100);step('send',progress.value+'%');
       }
-      progress.removeAttribute('value');say('Handing it to WordPress.com…');
+      progress.hidden=true;step('unpack');say('Handing it over…');
       let result;
       try{result=await api('finish',job.id);}catch(error){
         // Never repeat a possibly accepted upload after a network failure.
@@ -92,7 +111,7 @@
     if(busy)return;
     if(!source){say('This window is not linked to your site yet. Go back to it, open Move to WordPress.com and click Connect and send my site.');return;}
     if(!csrf){say('Still getting ready — give it a moment and try again.');return;}
-    busy=true;waiting=true;button.disabled=true;say('Packing your site up…');
+    busy=true;waiting=true;button.disabled=true;step('pack');say('Packing your site up…');
     source.postMessage({type:'pgwpc:export',channel},sourceOrigin);
     setTimeout(()=>{if(waiting){waiting=false;say('Your site has not arrived. Keep its tab open, and start again from Move to WordPress.com.');}},180000);
   });
