@@ -30,10 +30,20 @@
     const res=await fetch('/api/transfer?action='+action+(id?'&id='+encodeURIComponent(id):'')+extra,{method:'POST',headers:{'x-pgwpc-csrf':csrf},body});
     const data=await res.json();if(!res.ok||data.error)throw new Error(data.error||'Transfer request failed.');return data;
   }
+  // the end of the journey deserves more than a sentence: show the two doors
+  // anyone wants next, and take away the button that would do it all again
+  function finish() {
+    const done=document.getElementById('done');
+    if(done)done.hidden=false;
+    button.hidden=true;
+    const review=document.getElementById('review');
+    if(review)review.parentElement.hidden=true;
+    if(done&&done.scrollIntoView)done.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
   async function watch(id) {
     for(let n=0;n<180;n++) {
       const job=await api('advance',id);
-      if(job.complete){progress.hidden=true;say('WordPress.com reports that the import is complete. Check your pages, images and design before sharing the site.');return;}
+      if(job.complete){progress.hidden=true;say('Your site has moved to WordPress.com.');finish();return;}
       if(job.failed||['failed','needs-review'].includes(job.phase))throw new Error(job.message||'WordPress.com stopped this import. Open its importer to review the result.');
       if(!job.importId)throw new Error('The upload result is not confirmed. Check the import on WordPress.com before starting another transfer.');
       say(job.state==='uploadProcessing'?'WordPress.com is processing the archive…':'WordPress.com is importing your site…');
