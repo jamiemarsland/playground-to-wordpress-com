@@ -59,7 +59,7 @@ function render() {
         <span class="pgwpc-badge">Guided · Early version</span></div>
         <section class="pgwpc-card"><h2>Send it over</h2>
         <p>Sign in to WordPress.com, check where it is going, and send. Nothing to download, nothing to upload by hand.</p>
-        <?php if (!$issues) : ?><button id="pgwpc-connect" class="button button-primary button-hero" data-title="<?php echo esc_attr(get_bloginfo('name')); ?>" data-export-url="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-nonce="<?php echo esc_attr(wp_create_nonce('pgwpc_export')); ?>">Connect and move my site</button><?php endif; ?>
+        <?php if (!$issues) : ?><button id="pgwpc-connect" class="button button-primary button-hero" data-title="<?php echo esc_attr(get_bloginfo('name')); ?>" data-export-url="<?php echo esc_url(admin_url('admin-post.php')); ?>" data-nonce="<?php echo esc_attr(wp_create_nonce('pgwpc_export')); ?>">Connect and send my site</button><?php endif; ?>
         <p id="pgwpc-transfer-status" role="status" aria-live="polite">Send it to a new or spare site. Whatever is already there can be replaced. Some plans may require a paid WordPress.com plan.</p>
         <p class="pgwpc-small">Keep the WordPress.com window open until it finishes.</p></section>
         <section class="pgwpc-card"><h2><span class="pgwpc-number">1</span> What you are sending</h2>
