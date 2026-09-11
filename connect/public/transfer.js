@@ -40,16 +40,34 @@
     if(review)review.parentElement.hidden=true;
     if(done&&done.scrollIntoView)done.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
+  // A browser slows timers right down in a tab nobody is looking at, and
+  // people look away — at WordPress.com, mostly, to watch their site arrive.
+  // So the wait ends early the moment the tab comes back, and the line keeps
+  // a running clock, because an indeterminate bar and a fixed sentence look
+  // identical to something that has died.
+  function waitOrWake(ms) {
+    return new Promise(resolve => {
+      let done=false;
+      const finish=()=>{ if(done)return; done=true; clearTimeout(timer); document.removeEventListener('visibilitychange',wake); resolve(); };
+      const wake=()=>{ if(!document.hidden) finish(); };
+      const timer=setTimeout(finish,ms);
+      document.addEventListener('visibilitychange',wake);
+    });
+  }
+  const spell=ms=>{ const s=Math.round(ms/1000); return s<60?s+'s':Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s'; };
   async function watch(id) {
-    for(let n=0;n<180;n++) {
+    const began=Date.now();
+    for(let n=0;n<360;n++) {
       const job=await api('advance',id);
       if(job.complete){progress.hidden=true;say('Your site is live on WordPress.com.');finish();return;}
       if(job.failed||['failed','needs-review'].includes(job.phase))throw new Error(job.message||'WordPress.com stopped this import. Open its importer to review the result.');
       if(!job.importId)throw new Error('The upload result is not confirmed. Check the import on WordPress.com before starting another transfer.');
-      say(job.state==='uploadProcessing'?'WordPress.com is unpacking it…':'WordPress.com is setting your site up…');
-      await new Promise(resolve=>setTimeout(resolve,5000));
+      const doing=job.state==='uploadProcessing'?'WordPress.com is unpacking it':'WordPress.com is setting your site up';
+      say(doing+'… '+spell(Date.now()-began)+'. You can watch it on WordPress.com; this keeps checking either way.');
+      await waitOrWake(5000);
     }
-    say('The import is still running. Use “Check import on WordPress.com” to follow it. Do not start another transfer.');
+    progress.hidden=true;
+    say('This is taking longer than expected. Open “See how it is going on WordPress.com” to check — your site may well be there. Do not send it again.');
   }
   async function upload(file) {
     try {
