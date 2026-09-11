@@ -71,15 +71,17 @@
     }catch(error){progress.hidden=true;say(error.message);}
   }
   button.addEventListener('click',()=>{
-    if(!source||!csrf||busy)return;
-    busy=true;waiting=true;button.disabled=true;say('Preparing your Playground archive…');
+    if(busy)return;
+    if(!source){say('This window is not linked to your site yet. Go back to it, open Move to WordPress.com and click Connect and send my site.');return;}
+    if(!csrf){say('Still getting ready — give it a moment and try again.');return;}
+    busy=true;waiting=true;button.disabled=true;say('Packing your site up…');
     source.postMessage({type:'pgwpc:export',channel},sourceOrigin);
-    setTimeout(()=>{if(waiting){waiting=false;say('The archive has not arrived. Keep Playground open and check its export status. Reopen this connection window to try again.');}},180000);
+    setTimeout(()=>{if(waiting){waiting=false;say('Your site has not arrived. Keep its tab open, and start again from Move to WordPress.com.');}},180000);
   });
   fetch('/api/connection').then(async res=>{
     const data=await res.json();if(!res.ok||data.error)throw new Error(data.error||'Connection check failed.');
     csrf=data.csrf;
-    say(source?'Ready. Check the destination above, then click Move my site here.':'Return to Playground and click Connect and move my site to link this window.');
+    say(source?'Ready. Check where it is going, then click Send my site here.':'Open this window from your site: go to Move to WordPress.com and click Connect and send my site.');
     button.disabled=!source;
     maybeStart();
   }).catch(error=>say(error.message));
